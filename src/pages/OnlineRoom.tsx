@@ -8,7 +8,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useGame } from '../context/GameContext';
 import { useRoomDetail } from '../hooks/useRoomDetail';
-import { joinRoom, leaveRoom, setReady, startRoom } from '../services/roomService';
+import { leaveRoom, setReady, startRoom } from '../services/roomService';
+import { supabase } from '../lib/supabase';
 
 const roundModeLabel: Record<string, string> = {
   ascending: 'Ascendente',
@@ -21,7 +22,7 @@ export function OnlineRoom() {
   const { user } = useAuth();
   const { createGameFromRoom } = useGame();
   const navigate = useNavigate();
-  const { room, players, loading, error } = useRoomDetail(id ?? '');
+  const { room, players, loading, error, refetch } = useRoomDetail(id ?? '');
 
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -68,12 +69,24 @@ export function OnlineRoom() {
 
     hasAutoJoinedRef.current = true;
 
-    joinRoom(room.id, user.profileId).catch((err) => {
-      hasAutoJoinedRef.current = false;
-      const message = err instanceof Error ? err.message : 'Error al unirse a la sala';
-      setActionError(message);
-      setTimeout(() => navigate('/lobby'), 2500);
-    });
+    (async () => {
+      const { error: insertError } = await supabase.from('room_players').insert({
+        room_id: room.id,
+        profile_id: user.profileId,
+        seat_index: players.length,
+        is_ready: false,
+      });
+
+      if (insertError) {
+        console.error('JOIN ERROR:', insertError);
+        hasAutoJoinedRef.current = false;
+        setActionError(insertError.message ?? 'Error al unirse a la sala');
+        setTimeout(() => navigate('/lobby'), 2500);
+        return;
+      }
+
+      refetch();
+    })();
   }, [loading, room?.id, room?.status, players, user?.profileId]);
 
   const withAction = async (fn: () => Promise<void>) => {
