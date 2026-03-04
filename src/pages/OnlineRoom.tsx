@@ -29,6 +29,8 @@ export function OnlineRoom() {
   const [codeCopied, setCodeCopied] = useState(false);
   const hasJoinedGameRef = useRef(false);
   const hasAutoJoinedRef = useRef(false);
+  const playersRef = useRef(players);
+  useEffect(() => { playersRef.current = players; }, [players]);
 
   const handleCopyCode = () => {
     if (!room?.code) return;
@@ -47,12 +49,20 @@ export function OnlineRoom() {
   useEffect(() => {
     if (!room || !id) return;
     if (hasJoinedGameRef.current) return;
-    if (room.status === 'playing' && players.length > 0) {
+    if (room.status === 'playing') {
+      const latestPlayers = playersRef.current;
+      if (latestPlayers.length === 0) return;
       hasJoinedGameRef.current = true;
-      createGameFromRoom(room, players);
+      createGameFromRoom(room, latestPlayers);
       navigate(`/game/${id}`);
     }
-  }, [room?.status, room?.id, players.length]);
+  }, [room?.status, room?.id]);
+
+  useEffect(() => {
+    if (!room || !id || room.status !== 'waiting') return;
+    const interval = setInterval(() => { refetch(); }, 3000);
+    return () => clearInterval(interval);
+  }, [room?.id, room?.status]);
 
   useEffect(() => {
     if (loading || !room || !user?.profileId) return;
