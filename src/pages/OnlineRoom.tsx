@@ -8,9 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useGame } from '../context/GameContext';
 import { useRoomDetail } from '../hooks/useRoomDetail';
-import { leaveRoom, setReady, startRoom } from '../services/roomService';
-import { supabase } from '../lib/supabase';
-import type { Room } from '../types/rooms';
+import { joinRoom, leaveRoom, setReady, startRoom } from '../services/roomService';
 
 const roundModeLabel: Record<string, string> = {
   ascending: 'Ascendente',
@@ -23,49 +21,13 @@ export function OnlineRoom() {
   const { user } = useAuth();
   const { createGameFromRoom } = useGame();
   const navigate = useNavigate();
-  const { players, loading, error } = useRoomDetail(id ?? '');
+  const { room, players, loading, error } = useRoomDetail(id ?? '');
 
-  const [room, setRoom] = useState<Room | null>(null);
-  const [roomLoading, setRoomLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const hasJoinedGameRef = useRef(false);
-
-  useEffect(() => {
-    if (!id) return;
-    let isMounted = true;
-
-    const loadRoom = async () => {
-      setRoomLoading(true);
-      const { data, error } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-      if (!isMounted) return;
-      if (!error) setRoom(data);
-      setRoomLoading(false);
-    };
-
-    loadRoom();
-
-    const channel = supabase
-      .channel(`room-live-${id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${id}` },
-        (payload) => {
-          setRoom(payload.new as Room);
-        },
-      )
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      supabase.removeChannel(channel);
-    };
-  }, [id]);
+  const hasAutoJoinedRef = useRef(false);
 
   const handleCopyCode = () => {
     if (!room?.code) return;
@@ -92,18 +54,26 @@ export function OnlineRoom() {
   }, [room?.status, room?.id, players.length]);
 
   useEffect(() => {
-    if (loading || !room || room.status !== 'waiting' || !user?.profileId) return;
+    if (loading || !room || !user?.profileId) return;
+    if (hasAutoJoinedRef.current) return;
+
     const alreadyJoined = players.some((p) => p.profile_id === user.profileId);
     if (alreadyJoined) return;
 
-    supabase
-      .from('room_players')
-      .insert({ room_id: room.id, profile_id: user.profileId })
-      .then(({ error }) => {
-        if (error && (error as { code?: string }).code !== '23505') {
-          setActionError(error.message);
-        }
-      });
+    if (room.status !== 'waiting') {
+      setActionError('Esta sala ya no está disponible para unirse.');
+      setTimeout(() => navigate('/lobby'), 2500);
+      return;
+    }
+
+    hasAutoJoinedRef.current = true;
+
+    joinRoom(room.id, user.profileId).catch((err) => {
+      hasAutoJoinedRef.current = false;
+      const message = err instanceof Error ? err.message : 'Error al unirse a la sala';
+      setActionError(message);
+      setTimeout(() => navigate('/lobby'), 2500);
+    });
   }, [loading, room?.id, room?.status, players, user?.profileId]);
 
   const withAction = async (fn: () => Promise<void>) => {
@@ -134,7 +104,7 @@ export function OnlineRoom() {
     await startRoom(id, user.profileId);
   });
 
-  if (loading || roomLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
         <div className="flex items-center gap-2 text-slate-500">
