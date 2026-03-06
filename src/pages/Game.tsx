@@ -82,7 +82,7 @@ export function Game() {
       .channel(`pocha-game-${id}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pocha_games', filter: `room_id=eq.${id}` },
+        { event: '*', schema: 'public', table: 'pocha_games', filter: `room_id=eq.${id}` },
         (payload) => {
           if (!isMounted) return;
           const remoteState = (payload.new as { state: GameType }).state;
