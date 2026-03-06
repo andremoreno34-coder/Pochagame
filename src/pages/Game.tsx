@@ -63,16 +63,22 @@ export function Game() {
 
     // If the game is not yet in context (page refresh), load it from Supabase
     if (!game) {
-      supabase
-        .from('pocha_games')
-        .select('state')
-        .eq('room_id', id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (!isMounted || !data?.state) return;
+      const tryLoad = async (attempts: number) => {
+        if (!isMounted) return;
+        const { data } = await supabase
+          .from('pocha_games')
+          .select('state')
+          .eq('room_id', id)
+          .maybeSingle();
+        if (!isMounted) return;
+        if (data?.state) {
           isApplyingRemoteUpdateRef.current = true;
           replaceGame(id, data.state as GameType);
-        });
+        } else if (attempts > 0) {
+          setTimeout(() => tryLoad(attempts - 1), 2000);
+        }
+      };
+      tryLoad(10);
     }
 
     // Subscribe to UPDATE events on pocha_games for this room so all clients
@@ -206,16 +212,9 @@ export function Game() {
   if (!game) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
-          <h1 className="text-2xl font-bold text-slate-800 mb-4">Partida no encontrada</h1>
-          <p className="text-slate-600 mb-6">La partida que buscas no existe.</p>
-          <button
-            onClick={() => navigate('/lobby')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition duration-200 mx-auto"
-          >
-            <ArrowLeft size={18} />
-            Volver al lobby
-          </button>
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <svg className="animate-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          <span>Cargando partida...</span>
         </div>
       </div>
     );
