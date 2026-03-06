@@ -102,20 +102,18 @@ export function Game() {
   // All room members can write; the strictly sequential turn order of Pocha
   // prevents concurrent writes. isApplyingRemoteUpdateRef prevents the loop
   // where applying a remote update would re-trigger a write.
-  useEffect(() => {
-    if (!game || game.mode !== 'online') return;
-
-    if (isApplyingRemoteUpdateRef.current) {
-      // This render was caused by applying a remote update — skip writing back
-      isApplyingRemoteUpdateRef.current = false;
-      return;
-    }
+ useEffect(() => {
+    if (!game) return;
 
     supabase
       .from('pocha_games')
-      .upsert({ room_id: game.id, state: game }, { onConflict: 'room_id' });
-  }, [game]); // eslint-disable-line react-hooks/exhaustive-deps
-
+      .upsert({ room_id: game.id, state: game }, { onConflict: 'room_id' })
+      .then(({ error }) => {
+        if (error) console.error('UPSERT ERROR:', error);
+        else console.log('UPSERT OK:', game.id);
+      });
+  }, [game?.id]);
+  
   const preBiddingActive = (() => {
     if (!game || !game.started || game.currentHandsByPlayer === null) return false;
     const cp = game.rounds[game.currentRoundIndex];
