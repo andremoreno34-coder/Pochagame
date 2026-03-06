@@ -49,14 +49,16 @@ export function OnlineRoom() {
   useEffect(() => {
     if (!room || !id) return;
     if (hasJoinedGameRef.current) return;
-    if (room.status === 'playing') {
+    if (room.status !== 'playing') return;
+    hasJoinedGameRef.current = true;
+    if (isHost) {
       const latestPlayers = playersRef.current;
-      if (latestPlayers.length === 0) return;
-      hasJoinedGameRef.current = true;
-      createGameFromRoom(room, latestPlayers);
-      navigate(`/game/${id}`);
+      if (latestPlayers.length > 0) {
+        createGameFromRoom(room, latestPlayers);
+      }
     }
-  }, [room?.status, room?.id]);
+    navigate(`/game/${id}`, { replace: true });
+  }, [room?.status, room?.id, isHost]);
 
   useEffect(() => {
     if (!room || !id || room.status !== 'waiting') return;
