@@ -43,12 +43,7 @@ export function Game() {
 
   const { room } = useRoomDetail(id ?? '');
 
-  useEffect(() => {
-    if (!room || !id) return;
-    if (room.status === 'playing') {
-      navigate(`/game/${id}`, { replace: true });
-    }
-  }, [room?.status, id, navigate]);
+  
 
   const game = id ? getGameById(id) : undefined;
   console.log('DEBUG Game.tsx -> id de la URL:', id, 'game:', game);
