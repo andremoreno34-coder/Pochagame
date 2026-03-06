@@ -47,29 +47,18 @@ export function OnlineRoom() {
   const canStart = isHost && players.length >= 2 && room?.status === 'waiting';
 
   useEffect(() => {
-    if (!id) return;
-    const channel = supabase
-      .channel(`nav-${id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${id}` },
-        (payload) => {
-          if (payload.new.status !== 'playing') return;
-          if (hasJoinedGameRef.current) return;
-          hasJoinedGameRef.current = true;
-          const currentIsHost = payload.new.host_profile_id === user?.profileId;
-          if (currentIsHost) {
-            const latestPlayers = playersRef.current;
-            if (latestPlayers.length > 0) {
-              createGameFromRoom(payload.new as any, latestPlayers);
-            }
-          }
-          navigate(`/game/${id}`, { replace: true });
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [id, user?.profileId]);
+    if (!room || !id) return;
+    if (hasJoinedGameRef.current) return;
+    if (room.status !== 'playing') return;
+    hasJoinedGameRef.current = true;
+    if (isHost) {
+      const latestPlayers = playersRef.current;
+      if (latestPlayers.length > 0) {
+        createGameFromRoom(room, latestPlayers);
+      }
+    }
+    navigate(`/game/${id}`, { replace: true });
+  }, [room?.status, room?.id, isHost]);
 
   useEffect(() => {
     if (!room || !id || room.status !== 'waiting') return;
