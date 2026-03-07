@@ -104,15 +104,17 @@ export function Game() {
   // where applying a remote update would re-trigger a write.
  useEffect(() => {
     if (!game) return;
-
+    if (isApplyingRemoteUpdateRef.current) {
+      isApplyingRemoteUpdateRef.current = false;
+      return;
+    }
     supabase
       .from('pocha_games')
       .upsert({ room_id: game.id, state: game }, { onConflict: 'room_id' })
       .then(({ error }) => {
         if (error) console.error('UPSERT ERROR:', error);
-        else console.log('UPSERT OK:', game.id);
       });
-  }, [game?.id]);
+  }, [game]);
   
   const preBiddingActive = (() => {
     if (!game || !game.started || game.currentHandsByPlayer === null) return false;
